@@ -2,12 +2,15 @@
 
 const express = require("express");
 const router = express.Router();
-
 const { 
   joinSession, 
   activateSession,
-  endSession
+  endSession,
+  submitLiveQuiz,
+  getLiveSessionResults // <-- Add this
 } = require("../controllers/liveSessionController");
+
+
 const verifyToken = require("../middleware/verifyToken");
 const checkRole = require("../middleware/checkRole");
 // @route   POST /api/sessions/join
@@ -39,6 +42,26 @@ router.post(
   verifyToken,
   checkRole(["teacher"]),
   endSession
+);
+
+// @route   POST /api/sessions/:id/submit
+// @desc    (Student) Submit answers for a live quiz
+// @access  Private (Student only)
+router.post(
+  "/:id/submit",
+  verifyToken,
+  checkRole(["student"]),
+  submitLiveQuiz
+);
+
+// @route   GET /api/sessions/:id/results
+// @desc    (Teacher) Get final results for a live quiz
+// @access  Private (Teacher only)
+router.get(
+  "/:id/results",
+  verifyToken,
+  checkRole(["teacher"]),
+  getLiveSessionResults
 );
 
 module.exports = router;

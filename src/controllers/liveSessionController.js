@@ -232,10 +232,179 @@ const endSession = async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 };
+/**
+ * @description (Student) Submit answers for a LIVE session
+ * @route POST /api/sessions/:id/submit
+ * @access Private (Students only)
+ */
+const submitLiveQuiz = async (req, res) => {
+  try {
+    const sessionId = req.params.id;
+    const studentId = req.user.id;
+    const studentAnswers = req.body.answers; // e.g., [0, 2, 1]
+
+    if (!studentAnswers || !Array.isArray(studentAnswers)) {
+      return res.status(400).json({ error: "An 'answers' array is required." });
+    }
+
+    // 1. Get the session document
+    const sessionRef = db.collection("liveSessions").doc(sessionId);
+    const sessionDoc = await sessionRef.get();
+
+    if (!sessionDoc.exists) {
+      return res.status(404).json({ error: "Session not found." });
+    }
+    const sessionData = sessionDoc.data();
+
+    // 2. CHECK 1: Is the session active?
+    if (sessionData.status !== "active") {
+      return res.status(403).json({ error: "This quiz is not active or has already ended." });
+    }
+
+    // 3. CHECK 2: Is the time up?
+    const endTime = new Date(sessionData.endTime).getTime();
+    if (Date.now() > endTime) {
+      // If time is up, set status to finished (self-healing)
+      await sessionRef.update({ status: "finished" });
+      return res.status(403).json({ error: "Time's up! Your submission was not accepted." });
+    }
+
+    // 4. CHECK 3: Is this student part of the session?
+    if (!sessionData.participants.includes(studentId)) {
+      return res.status(403).json({ error: "You are not a participant in this session." });
+    }
+
+    // 5. CHECK 4: Have they already submitted?
+    const submissionQuery = await db.collection("submissions")
+      .where("sessionId", "==", sessionId)
+      .where("studentId", "==", studentId)
+      .limit(1).get();
+
+    if (!submissionQuery.empty) {
+      return res.status(400).json({ error: "You have already submitted your answers for this quiz." });
+    }
+
+    // 6. ALL CHECKS PASSED - Let's grade it.
+    const quizRef = db.collection("quizzes").doc(sessionData.quizId);
+    const quizDoc = await quizRef.get();
+    if (!quizDoc.exists) {
+      return res.status(500).json({ error: "Quiz data not found." });
+    }
+    
+    const correctAnswers = quizDoc.data().questions.map(q => q.correctAnswer);
+    let score = 0;
+    const totalQuestions = correctAnswers.length;
+
+    if (studentAnswers.length !== totalQuestions) {
+      return res.status(400).json({ error: `Submission failed: Expected ${totalQuestions} answers, but received ${studentAnswers.length}.` });
+    }
+
+    for (let i = 0; i < totalQuestions; i++) {
+      if (studentAnswers[i] === correctAnswers[i]) {
+        score++;
+      }
+    }
+
+    // 7. Save the submission
+    const submissionData = {
+      sessionId: sessionId, // <-- Link to the LIVE session
+      quizId: sessionData.quizId,
+      studentId: studentId,
+      submittedAnswers: studentAnswers,
+      score: score,
+      totalQuestions: totalQuestions,
+      submittedAt: new Date().toISOString(),
+    };
+
+    await db.collection("submissions").add(submissionData);
+
+    // 8. Send the result back to the student
+    res.status(200).json({
+      message: "Quiz submitted successfully!",
+      score: score,
+      totalQuestions: totalQuestions,
+    });
+
+  } catch (err) {
+    console.error("Error submitting live quiz:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+/**
+ * @description (Teacher) Get results and participant list for a session
+ * @route GET /api/sessions/:id/results
+ * @access Private (Teachers only)
+ */
+const getLiveSessionResults = async (req, res) => {
+  try {
+    const sessionId = req.params.id;
+    const teacherId = req.user.id;
+
+    // 1. Get the session and verify teacher ownership
+    const sessionDoc = await db.collection("liveSessions").doc(sessionId).get();
+    if (!sessionDoc.exists) {
+      return res.status(404).json({ error: "Session not found." });
+    }
+    if (sessionDoc.data().teacherId !== teacherId) {
+      return res.status(403).json({ error: "Forbidden: You do not own this session." });
+    }
+
+    const sessionData = sessionDoc.data();
+
+    // 2. Get all submissions for this session
+    const submissionsSnapshot = await db.collection("submissions")
+      .where("sessionId", "==", sessionId).get();
+    
+    // Store submissions in a Map for fast lookup
+    const submissions = new Map();
+    submissionsSnapshot.forEach(doc => {
+      submissions.set(doc.data().studentId, doc.data());
+    });
+
+    // 3. Get participant details (name, etc.)
+    const participants = [];
+    if (sessionData.participants.length > 0) {
+      const usersSnapshot = await db.collection("users")
+        .where(admin.firestore.FieldPath.documentId(), "in", sessionData.participants)
+        .get();
+
+      // 4. Combine participant data with submission data
+      usersSnapshot.forEach(userDoc => {
+        const studentId = userDoc.id;
+        const studentData = userDoc.data();
+        const submission = submissions.get(studentId);
+
+        participants.push({
+          studentId: studentId,
+          name: studentData.name,
+          mis: studentData.mis,
+          status: submission ? "Submitted" : "Not Submitted",
+          score: submission ? submission.score : 0,
+          totalQuestions: submission ? submission.totalQuestions : sessionData.totalQuestions,
+          submittedAt: submission ? submission.submittedAt : null,
+        });
+      });
+    }
+
+    res.status(200).json({
+      sessionId: sessionId,
+      status: sessionData.status,
+      pin: sessionData.pin,
+      participants: participants,
+    });
+
+  } catch (err) {
+    console.error("Error getting session results:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 
 module.exports = {
   startSession,
   joinSession,
   activateSession,
-  endSession, // <-- Add this
+  endSession,
+  submitLiveQuiz,
+  getLiveSessionResults, // <-- Add this
 };
