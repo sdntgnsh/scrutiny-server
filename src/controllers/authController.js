@@ -122,7 +122,21 @@ const register = async (req, res) => {
   }
 };
 
+const getMe = (req, res) => {
+  // 'verifyToken' already did all the hard work.
+  // We just send back the data it found.
+  res.status(200).json({
+    message: "Token is valid. User profile retrieved.",
+    user: {
+      id: req.user.id,
+      email: req.user.email,
+      role: req.userRole,
+    },
+  });
+};
+
 module.exports = {
   register,
+  getMe,
   // We will not have a 'login' function here. See explanation.
 };

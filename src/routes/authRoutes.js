@@ -3,14 +3,20 @@
 
 const express = require("express");
 const router = express.Router();
-const { register } = require("../controllers/authController");
+
+// Import controllers (merged into one line)
+const { register, getMe } = require("../controllers/authController");
+
+// --- FIX IS HERE ---
+// Removed the { } because verifyToken is exported directly, not as an object.
+const verifyToken = require("../middleware/verifyToken");
 
 // @route   POST /api/auth/register
-// @desc    Register a new user (teacher or student)
-// @access  Public (or protected by an admin-only key if you prefer)
+// @desc    Register a new user
 router.post("/register", register);
 
-// Note: There is no '/login' route.
-// Login is handled directly by the client (Electron app).
+// @route   GET /api/auth/me
+// @desc    Test JWT and get current user's profile
+router.get("/me", verifyToken, getMe);
 
 module.exports = router;
