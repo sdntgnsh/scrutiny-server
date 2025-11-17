@@ -23,11 +23,13 @@ app.use(express.json()); // This is CRITICAL. It parses incoming JSON payloads (
 // --- API Routes ---
 // Import your route files
 const authRoutes = require("./src/routes/authRoutes");
-// const quizRoutes = require("./src/routes/quizRoutes");
+const quizRoutes = require("./src/routes/quizRoutes");
+
 
 // Tell Express to use your routes.
 // All routes in 'authRoutes' will be prefixed with '/api/auth'
 app.use("/api/auth", authRoutes);
+app.use("/api/quizzes", quizRoutes);
 
 // All routes in 'quizRoutes' will be prefixed with '/api/quiz'
 // app.use("/api/quiz", quizRoutes);
