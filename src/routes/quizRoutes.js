@@ -11,7 +11,7 @@ const {
   submitQuiz, 
   getQuizResults,
 } = require("../controllers/quizController");
-
+const { startSession } = require("../controllers/liveSessionController");
 
 // 2. Import your existing auth middleware
 const verifyToken = require("../middleware/verifyToken");
@@ -57,6 +57,16 @@ router.get(
   verifyToken,
   checkRole(["teacher"]), // <-- Note: "teacher" role is required
   getQuizResults
+);
+
+// @route   POST /api/quizzes/:id/start
+// @desc    Start a new live session for a quiz
+// @access  Private (Teacher only)
+router.post(
+  "/:id/start",
+  verifyToken,
+  checkRole(["teacher"]), // <-- Only teachers can start
+  startSession
 );
 
 module.exports = router;
