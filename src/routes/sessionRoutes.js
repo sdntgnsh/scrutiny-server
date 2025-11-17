@@ -5,7 +5,8 @@ const router = express.Router();
 
 const { 
   joinSession, 
-  activateSession
+  activateSession,
+  endSession
 } = require("../controllers/liveSessionController");
 const verifyToken = require("../middleware/verifyToken");
 const checkRole = require("../middleware/checkRole");
@@ -30,5 +31,14 @@ router.post(
   activateSession
 );
 
+// @route   POST /api/sessions/:id/end
+// @desc    (Teacher) Manually ends the quiz
+// @access  Private (Teacher only)
+router.post(
+  "/:id/end", // <-- :id is the SESSION ID
+  verifyToken,
+  checkRole(["teacher"]),
+  endSession
+);
 
 module.exports = router;

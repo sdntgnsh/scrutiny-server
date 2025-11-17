@@ -11,45 +11,52 @@ const { generatePin } = require("../utils/generatePin");
 const startSession = async (req, res) => {
   try {
     const quizId = req.params.id;
-    const teacherId = req.user.id; // from verifyToken
+    const teacherId = req.user.id;
+    
+    // --- 1. GET DURATION FROM REQUEST BODY ---
+    const { duration } = req.body; // e.g., 30 (for 30 minutes)
 
-    // 1. Verify the quiz exists and this teacher owns it
+    if (!duration || typeof duration !== 'number' || duration <= 0) {
+      return res.status(400).json({ error: "A valid 'duration' (in minutes) is required." });
+    }
+    // ---
+
+    // 2. Verify the quiz exists and this teacher owns it
+    // ... (rest of your existing validation) ...
     const quizRef = db.collection("quizzes").doc(quizId);
     const quizDoc = await quizRef.get();
-
     if (!quizDoc.exists) {
       return res.status(404).json({ error: "Quiz not found" });
     }
-
     if (quizDoc.data().creatorId !== teacherId) {
-      return res.status(403).json({ 
-        error: "Forbidden: You can only start a session for your own quiz." 
-      });
+      return res.status(403).json({ error: "Forbidden: You can only start a session for your own quiz." });
     }
 
-    // 2. Generate a unique PIN
-    // (In a production app, you'd check for collisions, but this is fine for now)
+    // 3. Generate a unique PIN
     const pin = generatePin();
 
-    // 3. Create the new live session object
+    // 4. Create the new live session object
     const newSession = {
       quizId: quizId,
       teacherId: teacherId,
       pin: pin,
-      status: "lobby", // 'lobby', 'active', 'finished'
-      currentQuestion: 0,
-      participants: [], // We can store student IDs here as they join
+      status: "lobby",
+      participants: [],
       createdAt: new Date().toISOString(),
+      
+      // --- 2. ADD DURATION TO THE DOCUMENT ---
+      durationInMinutes: duration 
     };
 
-    // 4. Save the new session to the 'liveSessions' collection
+    // 5. Save the new session
     const sessionRef = await db.collection("liveSessions").add(newSession);
 
-    // 5. Send back the PIN and new session ID
+    // 6. Send back the PIN and new session ID
     res.status(201).json({
       message: "Live session started. Waiting for students to join.",
       sessionId: sessionRef.id,
       pin: pin,
+      duration: duration,
     });
 
   } catch (err) {
@@ -57,7 +64,6 @@ const startSession = async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 };
-
 
 /**
  * @description Join a live quiz session using a PIN
@@ -113,8 +119,7 @@ const joinSession = async (req, res) => {
     console.error("Error joining session:", err);
     res.status(500).json({ error: "Internal server error" });
   }
-};
-/**
+};/**
  * @description (Teacher) Activates a session, changing status from 'lobby' to 'active'
  * @route POST /api/sessions/:id/start
  * @access Private (Teachers only)
@@ -144,18 +149,35 @@ const activateSession = async (req, res) => {
       return res.status(400).json({ error: `Session is already ${sessionData.status}, cannot start.` });
     }
 
-    // 4. Update the session status to "active"
-    // We also set currentQuestion to 1 to signal the first question.
+    // --- 4. START: NEW TIMER LOGIC ---
+    const duration = sessionData.durationInMinutes;
+    if (!duration) {
+      return res.status(500).json({ error: "Session is missing duration. Cannot start." });
+    }
+
+    // Calculate the end time in milliseconds
+    const startTime = Date.now();
+    const endTime = startTime + (duration * 60 * 1000); 
+    // --- END: NEW TIMER LOGIC ---
+
+
+    // 5. Update the session status to "active"
     await sessionRef.update({
       status: "active",
-      currentQuestion: 1 // <-- This indicates the quiz has begun
+      // currentQuestion: 1, // We don't need this for your new logic
+      
+      // --- ADD THESE TWO FIELDS ---
+      startTime: new Date(startTime).toISOString(),
+      endTime: new Date(endTime).toISOString()
     });
 
-    // 5. Send success response
+    // 6. Send success response
     res.status(200).json({
       message: "Quiz session is now active!",
       sessionId: sessionId,
       status: "active",
+      startTime: new Date(startTime).toISOString(),
+      endTime: new Date(endTime).toISOString(),
     });
 
   } catch (err) {
@@ -163,9 +185,57 @@ const activateSession = async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 };
+/**
+ * @description (Teacher) Manually ends a session
+ * @route POST /api/sessions/:id/end
+ * @access Private (Teachers only)
+ */
+const endSession = async (req, res) => {
+  try {
+    const sessionId = req.params.id;
+    const teacherId = req.user.id; // from verifyToken
+
+    // 1. Get the session document
+    const sessionRef = db.collection("liveSessions").doc(sessionId);
+    const sessionDoc = await sessionRef.get();
+
+    if (!sessionDoc.exists) {
+      return res.status(404).json({ error: "Session not found." });
+    }
+
+    const sessionData = sessionDoc.data();
+
+    // 2. Verify the teacher owns this session
+    if (sessionData.teacherId !== teacherId) {
+      return res.status(403).json({ error: "Forbidden: You do not own this session." });
+    }
+
+    // 3. Check if session is already finished
+    if (sessionData.status === "finished") {
+      return res.status(400).json({ error: "This session is already finished." });
+    }
+
+    // 4. Update the session status to "finished"
+    await sessionRef.update({
+      status: "finished"
+    });
+
+    // 5. Send success response
+    res.status(200).json({
+      message: "Quiz session has been manually ended.",
+      sessionId: sessionId,
+      status: "finished",
+    });
+
+  } catch (err) {
+    console.error("Error ending session:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
 
 module.exports = {
   startSession,
   joinSession,
-  activateSession, 
+  activateSession,
+  endSession, // <-- Add this
 };
