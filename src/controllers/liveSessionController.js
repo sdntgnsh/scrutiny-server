@@ -114,8 +114,58 @@ const joinSession = async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 };
+/**
+ * @description (Teacher) Activates a session, changing status from 'lobby' to 'active'
+ * @route POST /api/sessions/:id/start
+ * @access Private (Teachers only)
+ */
+const activateSession = async (req, res) => {
+  try {
+    const sessionId = req.params.id;
+    const teacherId = req.user.id; // from verifyToken
+
+    // 1. Get the session document
+    const sessionRef = db.collection("liveSessions").doc(sessionId);
+    const sessionDoc = await sessionRef.get();
+
+    if (!sessionDoc.exists) {
+      return res.status(404).json({ error: "Session not found." });
+    }
+
+    const sessionData = sessionDoc.data();
+
+    // 2. Verify the teacher owns this session
+    if (sessionData.teacherId !== teacherId) {
+      return res.status(403).json({ error: "Forbidden: You do not own this session." });
+    }
+
+    // 3. Check if the session is actually in the lobby
+    if (sessionData.status !== "lobby") {
+      return res.status(400).json({ error: `Session is already ${sessionData.status}, cannot start.` });
+    }
+
+    // 4. Update the session status to "active"
+    // We also set currentQuestion to 1 to signal the first question.
+    await sessionRef.update({
+      status: "active",
+      currentQuestion: 1 // <-- This indicates the quiz has begun
+    });
+
+    // 5. Send success response
+    res.status(200).json({
+      message: "Quiz session is now active!",
+      sessionId: sessionId,
+      status: "active",
+    });
+
+  } catch (err) {
+    console.error("Error activating session:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
 
 module.exports = {
   startSession,
-  joinSession, 
+  joinSession,
+  activateSession, 
 };
