@@ -94,3 +94,30 @@ The main workflow for a live, timed quiz.
 | `POST` | `/api/sessions/:id/submit`| Student | **4. Submit Answers:** Student submits answers. Fails if timer is up or session is not active. |
 | `POST` | `/api/sessions/:id/end` | Teacher | **(Manual):** Manually ends the quiz (e.g., if timer runs out). |
 | `GET` | `/api/sessions/:id/results`| Teacher | **5. Get Results:** Gets the final list of participants and their scores. |
+
+---
+
+### `POST` Requests (Body Required)
+
+| Method | Endpoint | Role | JSON Body Format |
+| :--- | :--- | :--- | :--- |
+| **`POST`** | `/api/auth/register` | All | `{ "email": "...", "password": "...", "name": "...", "role": "student OR teacher", "mis": "...", "employee_id": "..." }` |
+| **`POST`** | `/api/quizzes` | Teacher | `{ "title": "...", "subject": "...", "questions": [ { "questionText": "...", "options": ["...", "..."], "correctAnswer": 0 } ] }` |
+| **`POST`** | `/api/quizzes/:id/start` | Teacher | `{ "duration": 45 }` |
+| **`POST`** | `/api/sessions/join` | Student | `{ "pin": "123456" }` |
+| **`POST`** | `/api/sessions/:id/submit`| Student | `{ "answers": [0, 2, 1] }` |
+
+---
+
+### `GET` & `POST` Requests (No Body Required)
+
+These endpoints only require a valid Token for authorization.
+
+| Method | Endpoint | Role |
+| :--- | :--- | :--- |
+| **`GET`** | `/api/auth/me` | All |
+| **`GET`** | `/api/quizzes` | All |
+| **`GET`** | `/api/quizzes/:id` | All |
+| **`POST`**| `/api/sessions/:id/start` | Teacher |
+| **`POST`**| `/api/sessions/:id/end` | Teacher |
+| **`GET`** | `/api/sessions/:id/results` | Teacher |
