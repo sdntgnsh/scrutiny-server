@@ -176,10 +176,73 @@ const submitQuiz = async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 };
+/**
+ * @description Get all submissions for a specific quiz
+ * @route GET /api/quizzes/:id/results
+ * @access Private (Teachers only)
+ */
+const getQuizResults = async (req, res) => {
+  try {
+    const quizId = req.params.id;
+    const teacherId = req.user.id; // from verifyToken
+
+    // --- Optional Validation (Good Practice) ---
+    // Check if this teacher actually created this quiz
+    const quizRef = db.collection("quizzes").doc(quizId);
+    const quizDoc = await quizRef.get();
+
+    if (!quizDoc.exists) {
+      return res.status(404).json({ error: "Quiz not found" });
+    }
+
+    if (quizDoc.data().creatorId !== teacherId) {
+      return res.status(403).json({ 
+        error: "Forbidden: You do not have permission to view results for this quiz." 
+      });
+    }
+    // --- End Validation ---
+
+    // 1. Query the 'submissions' collection
+    const submissionsRef = db.collection("submissions");
+    const snapshot = await submissionsRef.where("quizId", "==", quizId).get();
+
+    if (snapshot.empty) {
+      return res.status(200).json({
+        message: "No submissions found for this quiz yet.",
+        results: [],
+      });
+    }
+
+    // 2. Map the results
+    const results = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        submissionId: doc.id,
+        studentId: data.studentId,
+        score: data.score,
+        totalQuestions: data.totalQuestions,
+        submittedAt: data.submittedAt,
+        // We don't need to send the full answer list here
+      };
+    });
+
+    // 3. Send the results
+    res.status(200).json({
+      quizTitle: quizDoc.data().title,
+      totalSubmissions: results.length,
+      results: results,
+    });
+
+  } catch (err) {
+    console.error("Error getting quiz results:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
 
 module.exports = {
   createQuiz,
   getAllQuizzes,
   getQuizById,
-  submitQuiz, 
+  submitQuiz,
+  getQuizResults,
 };

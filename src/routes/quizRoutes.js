@@ -9,6 +9,7 @@ const {
   getAllQuizzes, 
   getQuizById,  
   submitQuiz, 
+  getQuizResults,
 } = require("../controllers/quizController");
 
 
@@ -40,11 +41,22 @@ router.post(
 // @route   GET /api/quizzes
 // @desc    Get all available quizzes
 // @access  Private (All logged-in users)
-router.get("/", verifyToken, getAllQuizzes); // <-- ADD THIS LINE
+router.get("/", verifyToken, getAllQuizzes); 
 
 // @route   GET /api/quizzes/:id
 // @desc    Get one quiz by its ID
 // @access  Private (All logged-in users)
-router.get("/:id", verifyToken, getQuizById); // <-- ADD THIS LINE
+router.get("/:id", verifyToken, getQuizById);
+
+
+// @route   GET /api/quizzes/:id/results
+// @desc    Get all submissions for a quiz
+// @access  Private (Teacher only)
+router.get(
+  "/:id/results",
+  verifyToken,
+  checkRole(["teacher"]), // <-- Note: "teacher" role is required
+  getQuizResults
+);
 
 module.exports = router;
