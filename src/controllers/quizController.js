@@ -49,7 +49,65 @@ const createQuiz = async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 };
+/**
+ * @description Get all quizzes (metadata only)
+ * @route GET /api/quizzes
+ * @access Private (All logged-in users)
+ */
+const getAllQuizzes = async (req, res) => {
+  try {
+    const quizzesRef = db.collection("quizzes");
+    const snapshot = await quizzesRef.get();
+
+    if (snapshot.empty) {
+      return res.status(200).json([]); // Return empty array if no quizzes
+    }
+
+    // Map over the documents to create an array of quizzes
+    // We only send back basic info, not the full questions array
+    const quizzes = snapshot.docs.map(doc => ({
+      id: doc.id,
+      title: doc.data().title,
+      subject: doc.data().subject,
+      totalQuestions: doc.data().totalQuestions,
+      creatorId: doc.data().creatorId,
+    }));
+
+    res.status(200).json(quizzes);
+  } catch (err) {
+    console.error("Error getting all quizzes:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+/**
+ * @description Get a single quiz by its ID
+ * @route GET /api/quizzes/:id
+ * @access Private (All logged-in users)
+ */
+const getQuizById = async (req, res) => {
+  try {
+    const quizId = req.params.id;
+    const quizRef = db.collection("quizzes").doc(quizId);
+    const doc = await quizRef.get();
+
+    if (!doc.exists) {
+      return res.status(404).json({ error: "Quiz not found" });
+    }
+
+    // Return the full quiz data, including the questions
+    res.status(200).json({
+      id: doc.id,
+      ...doc.data(),
+    });
+  } catch (err) {
+    console.error("Error getting quiz by ID:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
 
 module.exports = {
   createQuiz,
+  getAllQuizzes, // <-- Add this
+  getQuizById,   // <-- Add this
 };

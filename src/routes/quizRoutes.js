@@ -4,7 +4,12 @@ const express = require("express");
 const router = express.Router();
 
 // 1. Import your new controller
-const { createQuiz } = require("../controllers/quizController");
+const {
+  createQuiz,
+  getAllQuizzes, 
+  getQuizById,   
+} = require("../controllers/quizController");
+
 
 // 2. Import your existing auth middleware
 const verifyToken = require("../middleware/verifyToken");
@@ -19,9 +24,14 @@ router.post(
   checkRole(["teacher"]),   // Next, check if their role is 'teacher'
   createQuiz              // If both pass, run the controller
 );
+// @route   GET /api/quizzes
+// @desc    Get all available quizzes
+// @access  Private (All logged-in users)
+router.get("/", verifyToken, getAllQuizzes); // <-- ADD THIS LINE
 
-// You can add more routes here later, e.g.:
-// router.get("/", verifyToken, getAllQuizzes);
-// router.get("/:id", verifyToken, getQuizById);
+// @route   GET /api/quizzes/:id
+// @desc    Get one quiz by its ID
+// @access  Private (All logged-in users)
+router.get("/:id", verifyToken, getQuizById); // <-- ADD THIS LINE
 
 module.exports = router;
