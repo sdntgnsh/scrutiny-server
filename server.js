@@ -1,39 +1,43 @@
 // --- server.js ---
-// This is the main entry point for your Node.js backend.
-
-require("dotenv").config(); // Loads environment variables from .env file
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 
 // --- Initialization ---
 const app = express();
-const PORT = process.env.PORT || 3001; // Use 3001 to avoid conflicts
+const PORT = process.env.PORT || 3001;
 
-// --- Database Connections ---
-// We don't need to import 'db' or 'supabaseAdmin' here
-// because they are already imported and used by the
-// controllers and middleware that our routes call.
-// This keeps the server.js file clean.
+// --- THIS IS THE FIX ---
+// We need to configure CORS to explicitly
+// allow the 'Authorization' header.
+
+const corsOptions = {
+  origin: "*", // For development. Be more specific in production!
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], // Allow standard methods
+  allowedHeaders: "*", // <-- THIS IS THE KEY LINE
+};
+
+// 1. REMOVED the 'app.options('*', ...)' line.
+// This 'app.use(cors(corsOptions))' is all we need.
+// The cors middleware automatically handles preflight OPTIONS requests
+// for all routes defined *after* this line.
+app.use(cors(corsOptions));
+// --- END OF FIX ---
 
 // --- Middleware ---
-app.use(cors()); // Allows requests from different origins
-app.use(express.json()); // This is CRITICAL. It parses incoming JSON payloads (like from Postman)
-// Without this, 'req.body' will be 'undefined'.
+// 2. Apply JSON body parser *after* CORS
+app.use(express.json());
 
 // --- API Routes ---
-// Import your route files
+// Import both route files
 const authRoutes = require("./src/routes/authRoutes");
 // const quizRoutes = require("./src/routes/quizRoutes");
 
-// Tell Express to use your routes.
-// All routes in 'authRoutes' will be prefixed with '/api/auth'
+// Use both route files
 app.use("/api/auth", authRoutes);
-
-// All routes in 'quizRoutes' will be prefixed with '/api/quiz'
 // app.use("/api/quiz", quizRoutes);
 
 // --- Root Endpoint ---
-// A simple health check to make sure the server is running
 app.get("/", (req, res) => {
   res.json({ status: "Quiz Backend API is running" });
 });

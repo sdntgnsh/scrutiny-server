@@ -1,5 +1,5 @@
 // --- src/controllers/authController.js ---
-// This controller handles creating a new user.
+// This is the FULL file, including the complete 'register' logic.
 
 const supabaseAdmin = require("../config/supabase");
 const db = require("../config/firebase");
@@ -10,23 +10,10 @@ const db = require("../config/firebase");
  */
 const register = async (req, res) => {
   try {
-    // 1. Get user details from the request body
-    const { email, password, name, role, mis, employee_id } = req.body;
+    // 1. Get user data from request body
+    const { email, password, role, name, mis, employee_id } = req.body;
 
-    // 2. Validate input
-    if (!email || !password || !name || !role) {
-      return res
-        .status(400)
-        .json({ error: "Email, password, name, and role are required" });
-    }
-
-    if (role !== "teacher" && role !== "student") {
-      return res
-        .status(400)
-        .json({ error: "Role must be 'teacher' or 'student'" });
-    }
-
-    // 3. Role-specific field validation
+    // 2. Validate input based on role
     if (role === "student" && !mis) {
       return res
         .status(400)
@@ -38,12 +25,10 @@ const register = async (req, res) => {
         .json({ error: "Teacher registration requires an Employee ID" });
     }
 
-    // 4. Check for MIS uniqueness (if student)
+    // 3. (Student Only) Check if MIS is unique before creating user
     if (role === "student") {
       const usersRef = db.collection("users");
-      // Query Firestore to see if any document already has this MIS
       const snapshot = await usersRef.where("mis", "==", mis).limit(1).get();
-
       if (!snapshot.empty) {
         return res
           .status(400)
@@ -51,80 +36,67 @@ const register = async (req, res) => {
       }
     }
 
-    // --- STEP 5: Create the user in Supabase Auth ---
-    // This only happens if all previous checks pass.
+    // 4. Create user in Supabase Auth
     const { data: authData, error: authError } =
       await supabaseAdmin.auth.admin.createUser({
         email: email,
         password: password,
-        email_confirm: true, // You can set this to 'false' to skip email verification
+        email_confirm: true, // Auto-confirm email
       });
 
     if (authError) {
       // This will catch errors like "User already registered"
-      console.error("Supabase Auth Error:", authError); // <-- ADDED THIS LINE
+      console.error("Supabase Auth Error:", authError);
       return res.status(400).json({ error: authError.message });
     }
 
     const user = authData.user;
-    if (!user) {
-      return res
-        .status(500)
-        .json({ error: "Failed to create user in Supabase" });
-    }
 
-    // --- STEP 6: Create the user profile in Firestore ---
-    // Now we build the profile object based on the role.
-
+    // 5. Create user profile in Firestore
     const userProfile = {
-      name: name,
       email: user.email,
-      role: role, // This is the role ('teacher' or 'student')
+      name: name,
+      role: role,
       createdAt: new Date().toISOString(),
-      auth_id: user.id,
     };
 
-    // Add the correct role-specific ID
+    // Add role-specific ID
     if (role === "student") {
       userProfile.mis = mis;
-    } else {
-      // role === 'teacher'
+    } else if (role === "teacher") {
       userProfile.employee_id = employee_id;
     }
 
-    // We set the document in Firestore using the user's ID
+    // Use the Supabase User ID (UUID) as the Firestore Document ID
     await db.collection("users").doc(user.id).set(userProfile);
 
-    // --- STEP 7: Success ---
-    // Send back the newly created user info (password is not included)
+    // 6. Return success response
+    // We don't send a token. User must log in separately.
     res.status(201).json({
       message: "User registered successfully",
       user: {
         id: user.id,
         email: user.email,
-        role: userProfile.role,
-        // Also send back their new ID
-        [role === "student" ? "mis" : "employee_id"]:
-          role === "student" ? mis : employee_id,
+        ...userProfile, // Spread the profile data
       },
     });
   } catch (err) {
     console.error("Error during registration:", err);
-    // Handle potential Firestore errors
-    if (err.code === "permission-denied") {
-      return res.status(503).json({
-        error: "Database permission error. Check backend service account.",
-      });
-    }
-    res
-      .status(500)
-      .json({ error: "Internal server error", message: err.message });
+    res.status(500).json({ error: "Server error", message: err.message });
   }
 };
 
+/**
+ * @description Get the current logged-in user's profile
+ * @route GET /api/auth/me
+ * @info This function only runs AFTER 'verifyToken' middleware succeeds
+ */
 const getMe = (req, res) => {
-  // 'verifyToken' already did all the hard work.
-  // We just send back the data it found.
+  console.log(req.user, req.userRole);
+  // The 'verifyToken' middleware has already run and
+  // attached 'req.user' and 'req.userRole' to the request.
+
+  // We just send that data back to the user.
   res.status(200).json({
     message: "Token is valid. User profile retrieved.",
     user: {
@@ -135,8 +107,9 @@ const getMe = (req, res) => {
   });
 };
 
+// --- UPDATE YOUR 'module.exports' AT THE BOTTOM ---
+// It should now export BOTH functions
 module.exports = {
   register,
   getMe,
-  // We will not have a 'login' function here. See explanation.
 };
