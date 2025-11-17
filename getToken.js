@@ -11,7 +11,7 @@ const SUPABASE_ANON_KEY = "";
 // --- --- --- --- --- --- --- --- --- --- --- --- ---
 // --- --- --- --- --- --- --- --- --- --- --- --- ---
 // --- EDIT THESE TWO LINES TO LOGIN AS YOUR USER ---
-const USER_EMAIL = "test-teacher-01@example.com";
+const USER_EMAIL = "test-student-01@example.com";
 const USER_PASSWORD = "SecurePassword123!";
 // --- --- --- --- --- --- --- --- --- --- --- --- ---
 // --- --- --- --- --- --- --- --- --- --- --- --- ---

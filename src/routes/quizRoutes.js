@@ -7,7 +7,8 @@ const router = express.Router();
 const {
   createQuiz,
   getAllQuizzes, 
-  getQuizById,   
+  getQuizById,  
+  submitQuiz, 
 } = require("../controllers/quizController");
 
 
@@ -24,6 +25,18 @@ router.post(
   checkRole(["teacher"]),   // Next, check if their role is 'teacher'
   createQuiz              // If both pass, run the controller
 );
+
+// @route   POST /api/quizzes/:id/submit
+// @desc    Submit answers to a quiz
+// @access  Private (Student only)
+router.post(
+  "/:id/submit",
+  verifyToken,
+  checkRole(["student"]), // <-- Note: "student" role is required
+  submitQuiz
+);
+
+
 // @route   GET /api/quizzes
 // @desc    Get all available quizzes
 // @access  Private (All logged-in users)

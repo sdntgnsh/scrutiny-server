@@ -105,9 +105,81 @@ const getQuizById = async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 };
+/**
+ * @description Submit answers for a quiz
+ * @route POST /api/quizzes/:id/submit
+ * @access Private (Students only)
+ */
+const submitQuiz = async (req, res) => {
+  try {
+    // 1. Get data from the request
+    const quizId = req.params.id;
+    const studentId = req.user.id; // from verifyToken middleware
+    const studentAnswers = req.body.answers; // Expecting an array of answers, e.g., [0, 2, 1]
+
+    // 2. Validation
+    if (!studentAnswers || !Array.isArray(studentAnswers)) {
+      return res.status(400).json({ error: "An 'answers' array is required." });
+    }
+
+    // 3. Fetch the quiz from Firestore to get the correct answers
+    const quizRef = db.collection("quizzes").doc(quizId);
+    const doc = await quizRef.get();
+
+    if (!doc.exists) {
+      return res.status(404).json({ error: "Quiz not found" });
+    }
+
+    // 4. Extract the correct answers from the quiz questions
+    const correctAnswers = doc.data().questions.map(q => q.correctAnswer);
+
+    // 5. Compare and calculate the score
+    let score = 0;
+    const totalQuestions = correctAnswers.length;
+
+    // Check if the student provided the right number of answers
+    if (studentAnswers.length !== totalQuestions) {
+      return res.status(400).json({ 
+        error: `Submission failed: Expected ${totalQuestions} answers, but received ${studentAnswers.length}.` 
+      });
+    }
+
+    for (let i = 0; i < totalQuestions; i++) {
+      if (studentAnswers[i] === correctAnswers[i]) {
+        score++;
+      }
+    }
+
+    // 6. Build the submission object
+    const submissionData = {
+      quizId: quizId,
+      studentId: studentId,
+      submittedAnswers: studentAnswers,
+      correctAnswers: correctAnswers,
+      score: score,
+      totalQuestions: totalQuestions,
+      submittedAt: new Date().toISOString(),
+    };
+
+    // 7. Save the submission to a new 'submissions' collection
+    await db.collection("submissions").add(submissionData);
+
+    // 8. Send the result back to the student
+    res.status(200).json({
+      message: "Quiz submitted successfully!",
+      score: score,
+      totalQuestions: totalQuestions,
+    });
+
+  } catch (err) {
+    console.error("Error submitting quiz:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
 
 module.exports = {
   createQuiz,
-  getAllQuizzes, // <-- Add this
-  getQuizById,   // <-- Add this
+  getAllQuizzes,
+  getQuizById,
+  submitQuiz, 
 };
