@@ -1,6 +1,6 @@
 // --- src/controllers/quizController.js ---
 
-const db = require("../config/firebase");
+const { db } = require("../config/firebase");
 
 /**
  * @description Create a new quiz

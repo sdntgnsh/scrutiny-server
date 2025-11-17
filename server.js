@@ -32,14 +32,13 @@ app.use(express.json());
 // Import both route files
 const authRoutes = require("./src/routes/authRoutes");
 const quizRoutes = require("./src/routes/quizRoutes");
-
+const sessionRoutes = require("./src/routes/sessionRoutes");
 
 // Use both route files
 app.use("/api/auth", authRoutes);
 app.use("/api/quizzes", quizRoutes);
+app.use("/api/sessions", sessionRoutes);
 
-// All routes in 'quizRoutes' will be prefixed with '/api/quiz'
-// app.use("/api/quiz", quizRoutes);
 
 // --- Root Endpoint ---
 app.get("/", (req, res) => {

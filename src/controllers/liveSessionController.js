@@ -1,6 +1,6 @@
 // --- src/controllers/liveSessionController.js ---
 
-const db = require("../config/firebase");
+const { db, admin } = require("../config/firebase");
 const { generatePin } = require("../utils/generatePin");
 
 /**
@@ -58,6 +58,64 @@ const startSession = async (req, res) => {
   }
 };
 
+
+/**
+ * @description Join a live quiz session using a PIN
+ * @route POST /api/sessions/join
+ * @access Private (Students only)
+ */
+const joinSession = async (req, res) => {
+  try {
+    const { pin } = req.body;
+    const studentId = req.user.id; // from verifyToken
+
+    if (!pin) {
+      return res.status(400).json({ error: "A 'pin' is required." });
+    }
+
+    // 1. Find the live session with this PIN
+    const sessionsRef = db.collection("liveSessions");
+    const snapshot = await sessionsRef
+      .where("pin", "==", pin)
+      .where("status", "==", "lobby") // Can only join sessions in the lobby
+      .limit(1)
+      .get();
+
+    if (snapshot.empty) {
+      return res.status(404).json({ error: "Invalid PIN or session is not active." });
+    }
+
+    // 2. Get the session document
+    const sessionDoc = snapshot.docs[0];
+    const sessionId = sessionDoc.id;
+    const sessionData = sessionDoc.data();
+
+    // 3. Check if student is already in the lobby
+    if (sessionData.participants.includes(studentId)) {
+      return res.status(400).json({ error: "You are already in this lobby." });
+    }
+
+    // 4. Add the student to the participants array
+    const sessionRef = db.collection("liveSessions").doc(sessionId);
+    await sessionRef.update({
+      participants: admin.firestore.FieldValue.arrayUnion(studentId)
+    });
+
+    // 5. Send success response
+    res.status(200).json({
+      message: "Successfully joined the lobby!",
+      sessionId: sessionId,
+      quizId: sessionData.quizId,
+      teacherId: sessionData.teacherId,
+    });
+
+  } catch (err) {
+    console.error("Error joining session:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 module.exports = {
   startSession,
+  joinSession, 
 };
