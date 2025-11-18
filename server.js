@@ -3,49 +3,44 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 
-// --- Initialization ---
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// --- THIS IS THE FIX ---
-// We need to configure CORS to explicitly
-// allow the 'Authorization' header.
+// --- TRUST NGROK PROXY ---
+app.set("trust proxy", 1);
 
+// --- CORS CONFIG FOR NGROK + VITE ---
 const corsOptions = {
-  origin: "*", // For development. Be more specific in production!
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], // Allow standard methods
-  allowedHeaders: "*", // <-- THIS IS THE KEY LINE
+  origin: [
+    "http://localhost:5173",       // Vite dev server
+    /\.ngrok-free\.app$/,          // Any ngrok-free domain
+  ],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: "*",
+  credentials: true,
 };
 
-// 1. REMOVED the 'app.options('*', ...)' line.
-// This 'app.use(cors(corsOptions))' is all we need.
-// The cors middleware automatically handles preflight OPTIONS requests
-// for all routes defined *after* this line.
+// Apply CORS middleware
 app.use(cors(corsOptions));
-// --- END OF FIX ---
 
-// --- Middleware ---
-// 2. Apply JSON body parser *after* CORS
+// --- JSON Body Parser ---
 app.use(express.json());
 
 // --- API Routes ---
-// Import both route files
 const authRoutes = require("./src/routes/authRoutes");
 const quizRoutes = require("./src/routes/quizRoutes");
 const sessionRoutes = require("./src/routes/sessionRoutes");
 
-// Use both route files
 app.use("/api/auth", authRoutes);
 app.use("/api/quizzes", quizRoutes);
 app.use("/api/sessions", sessionRoutes);
 
-
-// --- Root Endpoint ---
+// --- ROOT ENDPOINT ---
 app.get("/", (req, res) => {
   res.json({ status: "Quiz Backend API is running" });
 });
 
-// --- Start Server ---
+// --- START SERVER ---
 app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+  console.log(`Server running → http://localhost:${PORT}`);
 });

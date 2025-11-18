@@ -8,7 +8,7 @@ const {
   endSession,
   submitLiveQuiz,
   getSessionStatus,
-  getLiveSessionResults // <-- Add this
+  getLiveSessionResults
 } = require("../controllers/liveSessionController");
 
 

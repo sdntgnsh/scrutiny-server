@@ -50,6 +50,7 @@ router.get(
   "/:id",
   verifyToken,
   checkRole(["teacher"]), 
+  getQuizById
 );
 
 // @route   GET /api/quizzes/:id/results
