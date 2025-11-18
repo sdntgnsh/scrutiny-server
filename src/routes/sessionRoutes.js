@@ -8,7 +8,8 @@ const {
   endSession,
   submitLiveQuiz,
   getSessionStatus,
-  getLiveSessionResults
+  getLiveSessionResults,
+  getLiveQuizForStudent
 } = require("../controllers/liveSessionController");
 
 
@@ -76,5 +77,14 @@ router.get(
   getSessionStatus
 );
 
+// @route   GET /api/sessions/:id/quiz
+// @desc    (Student) Get the sanitized quiz questions for a live session
+// @access  Private (Student only)
+router.get(
+  "/:id/quiz",
+  verifyToken,
+  checkRole(["student"]),
+  getLiveQuizForStudent
+);
 
 module.exports = router;

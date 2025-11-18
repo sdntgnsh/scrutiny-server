@@ -433,12 +433,76 @@ const getSessionStatus = async (req, res) => {
   }
 };
 
+
+
+/**
+ * @description (Student) Get the quiz questions for a live session
+ * (This is the secure version that REMOVES answers)
+ * @route GET /api/sessions/:id/quiz
+ * @access Private (Students only)
+ */
+const getLiveQuizForStudent = async (req, res) => {
+  try {
+    const sessionId = req.params.id;
+    const studentId = req.user.id;
+
+    // 1. Get the session and verify the student is in it
+    const sessionDoc = await db.collection("liveSessions").doc(sessionId).get();
+    if (!sessionDoc.exists) {
+      return res.status(404).json({ error: "Session not found." });
+    }
+
+    const sessionData = sessionDoc.data();
+
+    // 2. CHECK 1: Is the quiz active?
+    if (sessionData.status !== "active") {
+      return res.status(403).json({ error: "This quiz is not active." });
+    }
+
+    // 3. CHECK 2: Is this student a participant?
+    if (!sessionData.participants.includes(studentId)) {
+      return res.status(403).json({ error: "You are not a participant in this session." });
+    }
+
+    // 4. All checks passed: Fetch the quiz
+    const quizDoc = await db.collection("quizzes").doc(sessionData.quizId).get();
+    if (!quizDoc.exists) {
+      return res.status(500).json({ error: "Quiz data not found." });
+    }
+
+    const quizData = quizDoc.data();
+
+    // 5. CRITICAL: Sanitize the questions (remove answers)
+    const sanitizedQuestions = quizData.questions.map(q => ({
+      questionText: q.questionText,
+      options: q.options
+      // We intentionally leave out 'correctAnswer'
+    }));
+
+    // 6. Send the safe, sanitized quiz to the student
+    res.status(200).json({
+      id: quizDoc.id,
+      title: quizData.title,
+      subject: quizData.subject,
+      totalQuestions: quizData.totalQuestions,
+      questions: sanitizedQuestions,
+      // Send the session end time so the student's timer is in sync
+      endTime: sessionData.endTime 
+    });
+
+  } catch (err) {
+    console.error("Error getting live quiz for student:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 module.exports = {
   startSession,
   joinSession,
   activateSession,
   endSession,
   submitLiveQuiz,
+  getLiveSessionResults,
   getSessionStatus,
-  getLiveSessionResults, 
+  getLiveQuizForStudent // <-- Add this
 };
