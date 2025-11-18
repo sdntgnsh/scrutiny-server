@@ -6,9 +6,9 @@ const router = express.Router();
 // 1. Import your new controller
 const {
   createQuiz,
-  getAllQuizzes, 
-  getQuizById,  
-  submitQuiz, 
+  getAllQuizzes,
+  getQuizById,
+  submitQuiz,
   getQuizResults,
 } = require("../controllers/quizController");
 const { startSession } = require("../controllers/liveSessionController");
@@ -22,9 +22,9 @@ const checkRole = require("../middleware/checkRole");
 // @access  Private (Teacher only)
 router.post(
   "/",
-  verifyToken,            // First, check if the user is logged in
-  checkRole(["teacher"]),   // Next, check if their role is 'teacher'
-  createQuiz              // If both pass, run the controller
+  verifyToken, // First, check if the user is logged in
+  checkRole(["teacher"]), // Next, check if their role is 'teacher'
+  createQuiz // If both pass, run the controller
 );
 
 // @route   POST /api/quizzes/:id/submit
@@ -37,21 +37,15 @@ router.post(
   submitQuiz
 );
 
-
 // @route   GET /api/quizzes
 // @desc    Get all available quizzes
 // @access  Private (All logged-in users)
-router.get("/", verifyToken, getAllQuizzes); 
+router.get("/", verifyToken, getAllQuizzes);
 
 // @route   GET /api/quizzes/:id
 // @desc    Get one quiz by its ID
 // @access  Private (All logged-in users)
-router.get(
-  "/:id",
-  verifyToken,
-  checkRole(["teacher"]), 
-  getQuizById
-);
+router.get("/:id", verifyToken, checkRole(["teacher", "student"]), getQuizById);
 
 // @route   GET /api/quizzes/:id/results
 // @desc    Get all submissions for a quiz
@@ -66,11 +60,6 @@ router.get(
 // @route   POST /api/quizzes/:id/start
 // @desc    Start a new live session for a quiz
 // @access  Private (Teacher only)
-router.post(
-  "/:id/start",
-  verifyToken,
-  checkRole(["teacher"]), 
-  startSession
-);
+router.post("/:id/start", verifyToken, checkRole(["teacher"]), startSession);
 
 module.exports = router;

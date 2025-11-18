@@ -22,7 +22,9 @@ const createQuiz = async (req, res) => {
       });
     }
     if (questions.length === 0) {
-      return res.status(400).json({ error: "A quiz must have at least one question." });
+      return res
+        .status(400)
+        .json({ error: "A quiz must have at least one question." });
     }
 
     // 4. Build the new quiz object
@@ -65,7 +67,7 @@ const getAllQuizzes = async (req, res) => {
 
     // Map over the documents to create an array of quizzes
     // We only send back basic info, not the full questions array
-    const quizzes = snapshot.docs.map(doc => ({
+    const quizzes = snapshot.docs.map((doc) => ({
       id: doc.id,
       title: doc.data().title,
       subject: doc.data().subject,
@@ -88,6 +90,8 @@ const getAllQuizzes = async (req, res) => {
 const getQuizById = async (req, res) => {
   try {
     const quizId = req.params.id;
+    const userRole = req.userRole; // Got from verifyToken middleware
+
     const quizRef = db.collection("quizzes").doc(quizId);
     const doc = await quizRef.get();
 
@@ -95,10 +99,29 @@ const getQuizById = async (req, res) => {
       return res.status(404).json({ error: "Quiz not found" });
     }
 
-    // Return the full quiz data, including the questions
+    const quizData = doc.data();
+
+    // --- SECURITY CHECK ---
+    // If the user is a student, we must HIDE the correct answers.
+    if (userRole === "student") {
+      const sanitizedQuestions = quizData.questions.map((q) => {
+        // We destructure 'correctAnswer' out, and keep the 'rest'
+        const { correctAnswer, ...rest } = q;
+        return rest;
+      });
+
+      // Return the quiz with the sanitized questions
+      return res.status(200).json({
+        id: doc.id,
+        ...quizData,
+        questions: sanitizedQuestions,
+      });
+    }
+
+    // If it's a Teacher, send the full data (so they can review/edit)
     res.status(200).json({
       id: doc.id,
-      ...doc.data(),
+      ...quizData,
     });
   } catch (err) {
     console.error("Error getting quiz by ID:", err);
@@ -131,7 +154,7 @@ const submitQuiz = async (req, res) => {
     }
 
     // 4. Extract the correct answers from the quiz questions
-    const correctAnswers = doc.data().questions.map(q => q.correctAnswer);
+    const correctAnswers = doc.data().questions.map((q) => q.correctAnswer);
 
     // 5. Compare and calculate the score
     let score = 0;
@@ -139,8 +162,8 @@ const submitQuiz = async (req, res) => {
 
     // Check if the student provided the right number of answers
     if (studentAnswers.length !== totalQuestions) {
-      return res.status(400).json({ 
-        error: `Submission failed: Expected ${totalQuestions} answers, but received ${studentAnswers.length}.` 
+      return res.status(400).json({
+        error: `Submission failed: Expected ${totalQuestions} answers, but received ${studentAnswers.length}.`,
       });
     }
 
@@ -170,7 +193,6 @@ const submitQuiz = async (req, res) => {
       score: score,
       totalQuestions: totalQuestions,
     });
-
   } catch (err) {
     console.error("Error submitting quiz:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -196,8 +218,9 @@ const getQuizResults = async (req, res) => {
     }
 
     if (quizDoc.data().creatorId !== teacherId) {
-      return res.status(403).json({ 
-        error: "Forbidden: You do not have permission to view results for this quiz." 
+      return res.status(403).json({
+        error:
+          "Forbidden: You do not have permission to view results for this quiz.",
       });
     }
     // --- End Validation ---
@@ -214,7 +237,7 @@ const getQuizResults = async (req, res) => {
     }
 
     // 2. Map the results
-    const results = snapshot.docs.map(doc => {
+    const results = snapshot.docs.map((doc) => {
       const data = doc.data();
       return {
         submissionId: doc.id,
@@ -232,7 +255,6 @@ const getQuizResults = async (req, res) => {
       totalSubmissions: results.length,
       results: results,
     });
-
   } catch (err) {
     console.error("Error getting quiz results:", err);
     res.status(500).json({ error: "Internal server error" });
