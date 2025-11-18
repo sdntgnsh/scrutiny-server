@@ -7,6 +7,7 @@ const {
   activateSession,
   endSession,
   submitLiveQuiz,
+  getSessionStatus,
   getLiveSessionResults // <-- Add this
 } = require("../controllers/liveSessionController");
 
@@ -63,5 +64,17 @@ router.get(
   checkRole(["teacher"]),
   getLiveSessionResults
 );
+
+
+// @route   GET /api/sessions/:id/status
+// @desc    (Student) Polls the session to check if it's "active"
+// @access  Private (Student only)
+router.get(
+  "/:id/status",
+  verifyToken,
+  // We don't need checkRole here, the controller handles the logic
+  getSessionStatus
+);
+
 
 module.exports = router;

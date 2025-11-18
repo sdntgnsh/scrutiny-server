@@ -398,7 +398,40 @@ const getLiveSessionResults = async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 };
+/**
+ * @description (Student/Teacher) Polls for the current status of a session
+ * @route GET /api/sessions/:id/status
+ * @access Private (All participants)
+ */
+const getSessionStatus = async (req, res) => {
+  try {
+    const sessionId = req.params.id;
+    const userId = req.user.id; // from verifyToken
 
+    // 1. Get the session
+    const sessionDoc = await db.collection("liveSessions").doc(sessionId).get();
+    if (!sessionDoc.exists) {
+      return res.status(404).json({ error: "Session not found." });
+    }
+
+    const sessionData = sessionDoc.data();
+
+    // 2. Security Check: Only the teacher or a joined participant can poll
+    if (sessionData.teacherId !== userId && !sessionData.participants.includes(userId)) {
+      return res.status(403).json({ error: "You are not part of this session." });
+    }
+
+    // 3. Return only the necessary status info
+    res.status(200).json({
+      status: sessionData.status, // "lobby", "active", or "finished"
+      endTime: sessionData.endTime || null, // Will be null during "lobby"
+    });
+
+  } catch (err) {
+    console.error("Error getting session status:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
 
 module.exports = {
   startSession,
@@ -406,5 +439,6 @@ module.exports = {
   activateSession,
   endSession,
   submitLiveQuiz,
-  getLiveSessionResults, // <-- Add this
+  getSessionStatus,
+  getLiveSessionResults, 
 };

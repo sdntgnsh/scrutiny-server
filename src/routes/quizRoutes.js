@@ -46,8 +46,11 @@ router.get("/", verifyToken, getAllQuizzes);
 // @route   GET /api/quizzes/:id
 // @desc    Get one quiz by its ID
 // @access  Private (All logged-in users)
-router.get("/:id", verifyToken, getQuizById);
-
+router.get(
+  "/:id",
+  verifyToken,
+  checkRole(["teacher"]), 
+);
 
 // @route   GET /api/quizzes/:id/results
 // @desc    Get all submissions for a quiz
@@ -65,7 +68,7 @@ router.get(
 router.post(
   "/:id/start",
   verifyToken,
-  checkRole(["teacher"]), // <-- Only teachers can start
+  checkRole(["teacher"]), 
   startSession
 );
 
