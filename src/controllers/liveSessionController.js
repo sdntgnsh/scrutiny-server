@@ -229,9 +229,9 @@ const endSession = async (req, res) => {
     }
 
     // 4. Update the session status to "finished"
-    // await sessionRef.update({
-    //   status: "finished"
-    // });
+    await sessionRef.update({
+      status: "finished",
+    });
 
     // 5. Send success response
     res.status(200).json({
