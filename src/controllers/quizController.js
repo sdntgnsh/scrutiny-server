@@ -208,8 +208,7 @@ const getQuizResults = async (req, res) => {
     const quizId = req.params.id;
     const teacherId = req.user.id; // from verifyToken
 
-    // --- Optional Validation (Good Practice) ---
-    // Check if this teacher actually created this quiz
+    // --- 1. Validation: Check Ownership ---
     const quizRef = db.collection("quizzes").doc(quizId);
     const quizDoc = await quizRef.get();
 
@@ -223,9 +222,8 @@ const getQuizResults = async (req, res) => {
           "Forbidden: You do not have permission to view results for this quiz.",
       });
     }
-    // --- End Validation ---
 
-    // 1. Query the 'submissions' collection
+    // --- 2. Get Submissions ---
     const submissionsRef = db.collection("submissions");
     const snapshot = await submissionsRef.where("quizId", "==", quizId).get();
 
@@ -236,20 +234,38 @@ const getQuizResults = async (req, res) => {
       });
     }
 
-    // 2. Map the results
-    const results = snapshot.docs.map((doc) => {
-      const data = doc.data();
-      return {
-        submissionId: doc.id,
-        studentId: data.studentId,
-        score: data.score,
-        totalQuestions: data.totalQuestions,
-        submittedAt: data.submittedAt,
-        // We don't need to send the full answer list here
-      };
-    });
+    // --- 3. Map Results & Fetch Student Details (The Fix) ---
+    // We use Promise.all because we are making a DB call inside the map
+    const results = await Promise.all(
+      snapshot.docs.map(async (doc) => {
+        const submissionData = doc.data();
 
-    // 3. Send the results
+        // Fetch the student's profile from the 'users' collection
+        const userRef = db.collection("users").doc(submissionData.studentId);
+        const userSnapshot = await userRef.get();
+
+        let studentInfo = { mis: "Unknown", name: "Unknown" };
+
+        if (userSnapshot.exists) {
+          const userData = userSnapshot.data();
+          studentInfo = {
+            mis: userData.mis || "N/A", // Get the MIS
+            name: userData.name || userData.fullName || "Student", // Get Name for convenience
+          };
+        }
+
+        return {
+          submissionId: doc.id,
+          mis: studentInfo.mis, // <--- Sending MIS instead of studentId
+          studentName: studentInfo.name, // <--- Added Name for better UI
+          score: submissionData.score,
+          totalQuestions: submissionData.totalQuestions,
+          submittedAt: submissionData.submittedAt,
+        };
+      })
+    );
+
+    // --- 4. Send the results ---
     res.status(200).json({
       quizTitle: quizDoc.data().title,
       totalSubmissions: results.length,
@@ -261,10 +277,69 @@ const getQuizResults = async (req, res) => {
   }
 };
 
+/**
+ * @description Get quiz history for the logged-in student
+ * @route GET /api/quizzes/history
+ * @access Private (Students only)
+ */
+const getStudentHistory = async (req, res) => {
+  try {
+    const studentId = req.user.id; // From verifyToken
+
+    // 1. Query submissions for this specific student
+    const submissionsRef = db.collection("submissions");
+    const snapshot = await submissionsRef
+      .where("studentId", "==", studentId)
+      .orderBy("submittedAt", "desc") // Show newest first
+      .get();
+
+    if (snapshot.empty) {
+      return res.status(200).json([]);
+    }
+
+    // 2. Map through submissions and fetch the related Quiz Title
+    const history = await Promise.all(
+      snapshot.docs.map(async (doc) => {
+        const subData = doc.data();
+
+        // Fetch the quiz details to get the Title and Subject
+        const quizRef = db.collection("quizzes").doc(subData.quizId);
+        const quizDoc = await quizRef.get();
+
+        // Handle case where quiz might have been deleted by teacher
+        const quizTitle = quizDoc.exists
+          ? quizDoc.data().title
+          : "Deleted Quiz";
+        const quizSubject = quizDoc.exists ? quizDoc.data().subject : "N/A";
+
+        return {
+          submissionId: doc.id,
+          quizId: subData.quizId,
+          title: quizTitle,
+          subject: quizSubject,
+          score: subData.score,
+          totalQuestions: subData.totalQuestions,
+          submittedAt: subData.submittedAt,
+        };
+      })
+    );
+
+    res.status(200).json(history);
+  } catch (err) {
+    console.error("Error getting student history:", err);
+    // If 'orderBy' fails initially, it means you need a Firestore index.
+    // Check your console for a link to create it automatically.
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Don't forget to add it to module.exports!
 module.exports = {
   createQuiz,
   getAllQuizzes,
   getQuizById,
   submitQuiz,
   getQuizResults,
+  getStudentHistory, // <--- Added here
 };
+

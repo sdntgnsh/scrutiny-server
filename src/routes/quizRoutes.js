@@ -10,6 +10,7 @@ const {
   getQuizById,
   submitQuiz,
   getQuizResults,
+  getStudentHistory,
 } = require("../controllers/quizController");
 const { startSession } = require("../controllers/liveSessionController");
 
@@ -26,6 +27,11 @@ router.post(
   checkRole(["teacher"]), // Next, check if their role is 'teacher'
   createQuiz // If both pass, run the controller
 );
+
+// @route   GET /api/quizzes/history
+// @desc    Get past quiz results for the logged-in student
+// @access  Private (Student only)
+router.get("/history", verifyToken, checkRole(["student"]), getStudentHistory);
 
 // @route   POST /api/quizzes/:id/submit
 // @desc    Submit answers to a quiz

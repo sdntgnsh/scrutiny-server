@@ -12,12 +12,14 @@ const startSession = async (req, res) => {
   try {
     const quizId = req.params.id;
     const teacherId = req.user.id;
-    
+
     // --- 1. GET DURATION FROM REQUEST BODY ---
     const { duration } = req.body; // e.g., 30 (for 30 minutes)
 
-    if (!duration || typeof duration !== 'number' || duration <= 0) {
-      return res.status(400).json({ error: "A valid 'duration' (in minutes) is required." });
+    if (!duration || typeof duration !== "number" || duration <= 0) {
+      return res
+        .status(400)
+        .json({ error: "A valid 'duration' (in minutes) is required." });
     }
     // ---
 
@@ -29,7 +31,9 @@ const startSession = async (req, res) => {
       return res.status(404).json({ error: "Quiz not found" });
     }
     if (quizDoc.data().creatorId !== teacherId) {
-      return res.status(403).json({ error: "Forbidden: You can only start a session for your own quiz." });
+      return res.status(403).json({
+        error: "Forbidden: You can only start a session for your own quiz.",
+      });
     }
 
     // 3. Generate a unique PIN
@@ -43,9 +47,9 @@ const startSession = async (req, res) => {
       status: "lobby",
       participants: [],
       createdAt: new Date().toISOString(),
-      
+
       // --- 2. ADD DURATION TO THE DOCUMENT ---
-      durationInMinutes: duration 
+      durationInMinutes: duration,
     };
 
     // 5. Save the new session
@@ -58,7 +62,6 @@ const startSession = async (req, res) => {
       pin: pin,
       duration: duration,
     });
-
   } catch (err) {
     console.error("Error starting live session:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -88,7 +91,9 @@ const joinSession = async (req, res) => {
       .get();
 
     if (snapshot.empty) {
-      return res.status(404).json({ error: "Invalid PIN or session is not active." });
+      return res
+        .status(404)
+        .json({ error: "Invalid PIN or session is not active." });
     }
 
     // 2. Get the session document
@@ -104,7 +109,7 @@ const joinSession = async (req, res) => {
     // 4. Add the student to the participants array
     const sessionRef = db.collection("liveSessions").doc(sessionId);
     await sessionRef.update({
-      participants: admin.firestore.FieldValue.arrayUnion(studentId)
+      participants: admin.firestore.FieldValue.arrayUnion(studentId),
     });
 
     // 5. Send success response
@@ -114,12 +119,12 @@ const joinSession = async (req, res) => {
       quizId: sessionData.quizId,
       teacherId: sessionData.teacherId,
     });
-
   } catch (err) {
     console.error("Error joining session:", err);
     res.status(500).json({ error: "Internal server error" });
   }
-};/**
+};
+/**
  * @description (Teacher) Activates a session, changing status from 'lobby' to 'active'
  * @route POST /api/sessions/:id/start
  * @access Private (Teachers only)
@@ -141,34 +146,39 @@ const activateSession = async (req, res) => {
 
     // 2. Verify the teacher owns this session
     if (sessionData.teacherId !== teacherId) {
-      return res.status(403).json({ error: "Forbidden: You do not own this session." });
+      return res
+        .status(403)
+        .json({ error: "Forbidden: You do not own this session." });
     }
 
     // 3. Check if the session is actually in the lobby
     if (sessionData.status !== "lobby") {
-      return res.status(400).json({ error: `Session is already ${sessionData.status}, cannot start.` });
+      return res.status(400).json({
+        error: `Session is already ${sessionData.status}, cannot start.`,
+      });
     }
 
     // --- 4. START: NEW TIMER LOGIC ---
     const duration = sessionData.durationInMinutes;
     if (!duration) {
-      return res.status(500).json({ error: "Session is missing duration. Cannot start." });
+      return res
+        .status(500)
+        .json({ error: "Session is missing duration. Cannot start." });
     }
 
     // Calculate the end time in milliseconds
     const startTime = Date.now();
-    const endTime = startTime + (duration * 60 * 1000); 
+    const endTime = startTime + duration * 60 * 1000;
     // --- END: NEW TIMER LOGIC ---
-
 
     // 5. Update the session status to "active"
     await sessionRef.update({
       status: "active",
       // currentQuestion: 1, // We don't need this for your new logic
-      
+
       // --- ADD THESE TWO FIELDS ---
       startTime: new Date(startTime).toISOString(),
-      endTime: new Date(endTime).toISOString()
+      endTime: new Date(endTime).toISOString(),
     });
 
     // 6. Send success response
@@ -179,7 +189,6 @@ const activateSession = async (req, res) => {
       startTime: new Date(startTime).toISOString(),
       endTime: new Date(endTime).toISOString(),
     });
-
   } catch (err) {
     console.error("Error activating session:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -207,18 +216,22 @@ const endSession = async (req, res) => {
 
     // 2. Verify the teacher owns this session
     if (sessionData.teacherId !== teacherId) {
-      return res.status(403).json({ error: "Forbidden: You do not own this session." });
+      return res
+        .status(403)
+        .json({ error: "Forbidden: You do not own this session." });
     }
 
     // 3. Check if session is already finished
     if (sessionData.status === "finished") {
-      return res.status(400).json({ error: "This session is already finished." });
+      return res
+        .status(400)
+        .json({ error: "This session is already finished." });
     }
 
     // 4. Update the session status to "finished"
-    await sessionRef.update({
-      status: "finished"
-    });
+    // await sessionRef.update({
+    //   status: "finished"
+    // });
 
     // 5. Send success response
     res.status(200).json({
@@ -226,7 +239,6 @@ const endSession = async (req, res) => {
       sessionId: sessionId,
       status: "finished",
     });
-
   } catch (err) {
     console.error("Error ending session:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -258,7 +270,9 @@ const submitLiveQuiz = async (req, res) => {
 
     // 2. CHECK 1: Is the session active?
     if (sessionData.status !== "active") {
-      return res.status(403).json({ error: "This quiz is not active or has already ended." });
+      return res
+        .status(403)
+        .json({ error: "This quiz is not active or has already ended." });
     }
 
     // 3. CHECK 2: Is the time up?
@@ -266,22 +280,30 @@ const submitLiveQuiz = async (req, res) => {
     if (Date.now() > endTime) {
       // If time is up, set status to finished (self-healing)
       await sessionRef.update({ status: "finished" });
-      return res.status(403).json({ error: "Time's up! Your submission was not accepted." });
+      return res
+        .status(403)
+        .json({ error: "Time's up! Your submission was not accepted." });
     }
 
     // 4. CHECK 3: Is this student part of the session?
     if (!sessionData.participants.includes(studentId)) {
-      return res.status(403).json({ error: "You are not a participant in this session." });
+      return res
+        .status(403)
+        .json({ error: "You are not a participant in this session." });
     }
 
     // 5. CHECK 4: Have they already submitted?
-    const submissionQuery = await db.collection("submissions")
+    const submissionQuery = await db
+      .collection("submissions")
       .where("sessionId", "==", sessionId)
       .where("studentId", "==", studentId)
-      .limit(1).get();
+      .limit(1)
+      .get();
 
     if (!submissionQuery.empty) {
-      return res.status(400).json({ error: "You have already submitted your answers for this quiz." });
+      return res.status(400).json({
+        error: "You have already submitted your answers for this quiz.",
+      });
     }
 
     // 6. ALL CHECKS PASSED - Let's grade it.
@@ -290,13 +312,15 @@ const submitLiveQuiz = async (req, res) => {
     if (!quizDoc.exists) {
       return res.status(500).json({ error: "Quiz data not found." });
     }
-    
-    const correctAnswers = quizDoc.data().questions.map(q => q.correctAnswer);
+
+    const correctAnswers = quizDoc.data().questions.map((q) => q.correctAnswer);
     let score = 0;
     const totalQuestions = correctAnswers.length;
 
     if (studentAnswers.length !== totalQuestions) {
-      return res.status(400).json({ error: `Submission failed: Expected ${totalQuestions} answers, but received ${studentAnswers.length}.` });
+      return res.status(400).json({
+        error: `Submission failed: Expected ${totalQuestions} answers, but received ${studentAnswers.length}.`,
+      });
     }
 
     for (let i = 0; i < totalQuestions; i++) {
@@ -324,7 +348,6 @@ const submitLiveQuiz = async (req, res) => {
       score: score,
       totalQuestions: totalQuestions,
     });
-
   } catch (err) {
     console.error("Error submitting live quiz:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -340,36 +363,50 @@ const getLiveSessionResults = async (req, res) => {
     const sessionId = req.params.id;
     const teacherId = req.user.id;
 
+    console.log(
+      "XXXXXXXXXXXXXXXXXXXXXXXXGetting results for session:",
+      sessionId
+    );
+
     // 1. Get the session and verify teacher ownership
     const sessionDoc = await db.collection("liveSessions").doc(sessionId).get();
     if (!sessionDoc.exists) {
       return res.status(404).json({ error: "Session not found." });
     }
     if (sessionDoc.data().teacherId !== teacherId) {
-      return res.status(403).json({ error: "Forbidden: You do not own this session." });
+      return res
+        .status(403)
+        .json({ error: "Forbidden: You do not own this session." });
     }
 
     const sessionData = sessionDoc.data();
 
     // 2. Get all submissions for this session
-    const submissionsSnapshot = await db.collection("submissions")
-      .where("sessionId", "==", sessionId).get();
-    
+    const submissionsSnapshot = await db
+      .collection("submissions")
+      .where("sessionId", "==", sessionId)
+      .get();
+
     // Store submissions in a Map for fast lookup
     const submissions = new Map();
-    submissionsSnapshot.forEach(doc => {
+    submissionsSnapshot.forEach((doc) => {
       submissions.set(doc.data().studentId, doc.data());
     });
 
     // 3. Get participant details (name, etc.)
     const participants = [];
     if (sessionData.participants.length > 0) {
-      const usersSnapshot = await db.collection("users")
-        .where(admin.firestore.FieldPath.documentId(), "in", sessionData.participants)
+      const usersSnapshot = await db
+        .collection("users")
+        .where(
+          admin.firestore.FieldPath.documentId(),
+          "in",
+          sessionData.participants
+        )
         .get();
 
       // 4. Combine participant data with submission data
-      usersSnapshot.forEach(userDoc => {
+      usersSnapshot.forEach((userDoc) => {
         const studentId = userDoc.id;
         const studentData = userDoc.data();
         const submission = submissions.get(studentId);
@@ -380,7 +417,9 @@ const getLiveSessionResults = async (req, res) => {
           mis: studentData.mis,
           status: submission ? "Submitted" : "Not Submitted",
           score: submission ? submission.score : 0,
-          totalQuestions: submission ? submission.totalQuestions : sessionData.totalQuestions,
+          totalQuestions: submission
+            ? submission.totalQuestions
+            : sessionData.totalQuestions,
           submittedAt: submission ? submission.submittedAt : null,
         });
       });
@@ -392,7 +431,6 @@ const getLiveSessionResults = async (req, res) => {
       pin: sessionData.pin,
       participants: participants,
     });
-
   } catch (err) {
     console.error("Error getting session results:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -417,8 +455,13 @@ const getSessionStatus = async (req, res) => {
     const sessionData = sessionDoc.data();
 
     // 2. Security Check: Only the teacher or a joined participant can poll
-    if (sessionData.teacherId !== userId && !sessionData.participants.includes(userId)) {
-      return res.status(403).json({ error: "You are not part of this session." });
+    if (
+      sessionData.teacherId !== userId &&
+      !sessionData.participants.includes(userId)
+    ) {
+      return res
+        .status(403)
+        .json({ error: "You are not part of this session." });
     }
 
     // 3. Return only the necessary status info
@@ -426,7 +469,6 @@ const getSessionStatus = async (req, res) => {
       status: sessionData.status, // "lobby", "active", or "finished"
       endTime: sessionData.endTime || null, // Will be null during "lobby"
     });
-
   } catch (err) {
     console.error("Error getting session status:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -440,5 +482,5 @@ module.exports = {
   endSession,
   submitLiveQuiz,
   getSessionStatus,
-  getLiveSessionResults, 
+  getLiveSessionResults,
 };
